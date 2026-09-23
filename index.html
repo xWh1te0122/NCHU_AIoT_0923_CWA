@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-TW">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NCHU AIoT × CWA 智慧氣象監控儀表板</title>
+  <meta name="description" content="國立中興大學 AIoT 邊緣運算校園節點與交通部中央氣象署 (CWA) 開放資料整合監控平台。提供即時氣象、溫濕度趨勢、紫外線與土壤環境感測數據。">
+  <meta name="keywords" content="NCHU, AIoT, CWA, 中央氣象署, 氣象儀表板, 中興大學, 物聯網, 氣象預報">
+  
+  <!-- Favicon -->
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🌦️</text></svg>">
+  
+  <!-- Stylesheet -->
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+  <!-- Top Sticky Navigation -->
+  <header class="site-header">
+    <div class="header-container">
+      <div class="brand-wrapper">
+        <div class="brand-icon">🌱</div>
+        <div class="brand-text">
+          <h1>NCHU AIoT × CWA 氣象智慧站</h1>
+          <p>國立中興大學 物聯網與氣象署資料整合平台</p>
+        </div>
+      </div>
+
+      <div class="header-controls">
+        <div class="status-badge" id="stationStatusBadge">
+          <span class="pulse-dot"></span>
+          <span>節點連線中</span>
+        </div>
+
+        <select id="citySelect" class="city-select" aria-label="選擇縣市氣象">
+          <option value="Taichung" selected>📍 臺中市 (中興大學)</option>
+          <option value="Taipei">📍 臺北市</option>
+          <option value="NewTaipei">📍 新北市</option>
+          <option value="Kaohsiung">📍 高雄市</option>
+          <option value="Tainan">📍 臺南市</option>
+          <option value="Hualien">📍 花蓮縣</option>
+        </select>
+
+        <button id="refreshBtn" class="btn" title="手動同步更新數據">
+          <span id="refreshIcon">🔄</span>
+          <span>同步數據</span>
+        </button>
+
+        <button id="apiModalBtn" class="btn btn-primary" title="設定 CWA API 授權金鑰">
+          <span>⚙️ API 設定</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content Dashboard -->
+  <main class="dashboard-main">
+
+    <!-- Top Status Bar & Time -->
+    <section class="dashboard-topbar">
+      <div class="live-time-display">
+        <div class="time" id="liveTime">--:--:--</div>
+        <div class="date" id="liveDate">載入時間中...</div>
+      </div>
+      <div style="font-size: 0.85rem; color: var(--text-secondary);">
+        觀測來源：<strong style="color: var(--accent-cyan);">CWA 氣象署開放資料</strong> + <strong style="color: var(--accent-emerald);">NCHU 智慧農業感測陣列</strong>
+      </div>
+    </section>
+
+    <!-- Hero Weather Section -->
+    <section class="hero-weather-grid">
+      <!-- Current Weather Hero Card -->
+      <article class="glass-card current-weather-card">
+        <div class="cw-header">
+          <div class="cw-location">
+            <h2 id="locationTitle">臺中市 (中興大學校本部)</h2>
+            <span class="cw-tag" id="locationSubtitle">南區興大路145號</span>
+          </div>
+          <span style="font-size: 0.8rem; color: var(--accent-cyan); background: rgba(56, 189, 248, 0.1); padding: 0.3rem 0.6rem; border-radius: 6px;">即時監測中</span>
+        </div>
+
+        <div class="cw-icon-temp">
+          <div class="cw-big-icon" id="cwIcon">⛅</div>
+          <div>
+            <div style="display: flex; align-items: flex-start;">
+              <span class="cw-temp-value" id="cwTemp">28.5</span>
+              <span class="cw-temp-unit">°C</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="cw-desc-row">
+          <span class="condition" id="cwCondition">多雲時晴</span>
+          <span>•</span>
+          <span id="cwFeelsLike">體感溫度 30.2°C</span>
+          <span>•</span>
+          <span style="color: var(--accent-emerald);">空氣品質 AQI 良好</span>
+        </div>
+      </article>
+
+      <!-- Key Weather Mini Metrics Grid -->
+      <section class="stats-grid">
+        <div class="glass-card stat-card">
+          <div class="stat-icon blue">💧</div>
+          <div class="stat-info">
+            <div class="label">相對濕度 (RH)</div>
+            <div class="value" id="valHumidity">68%</div>
+          </div>
+        </div>
+
+        <div class="glass-card stat-card">
+          <div class="stat-icon cyan">☔</div>
+          <div class="stat-info">
+            <div class="label">降雨機率 (PoP)</div>
+            <div class="value" id="valRain">15%</div>
+          </div>
+        </div>
+
+        <div class="glass-card stat-card">
+          <div class="stat-icon amber">☀️</div>
+          <div class="stat-info">
+            <div class="label">紫外線指數 (UV)</div>
+            <div class="value" id="valUv">6 (高量級)</div>
+          </div>
+        </div>
+
+        <div class="glass-card stat-card">
+          <div class="stat-icon emerald">🧭</div>
+          <div class="stat-info">
+            <div class="label">風向風速</div>
+            <div class="value" id="valWind" style="font-size: 1.1rem;">西北風 12 km/h</div>
+          </div>
+        </div>
+      </section>
+    </section>
+
+    <!-- AIoT Campus Edge Sensor Telemetry -->
+    <section>
+      <div class="section-title-wrap">
+        <h3 class="section-title">
+          <span>📡</span>
+          <span>NCHU AIoT 邊緣感測節點 (Node-A1)</span>
+        </h3>
+        <span class="section-badge">MQTT Broker: iot.nchu.edu.tw • 連線良好</span>
+      </div>
+
+      <div class="aiot-nodes-grid">
+        <!-- Sensor 1: Soil Moisture -->
+        <div class="glass-card aiot-card">
+          <div class="aiot-top">
+            <span class="aiot-label">土壤容積含水量</span>
+            <span class="aiot-tag">試驗田區 #2</span>
+          </div>
+          <div class="aiot-value-row">
+            <span class="aiot-val" id="aiotSoil">42.8</span>
+            <span class="aiot-unit">%</span>
+          </div>
+          <div class="aiot-bar-bg">
+            <div class="aiot-bar-fill fill-emerald" id="aiotSoilBar" style="width: 42%;"></div>
+          </div>
+        </div>
+
+        <!-- Sensor 2: Ambient Illuminance -->
+        <div class="glass-card aiot-card">
+          <div class="aiot-top">
+            <span class="aiot-label">環境光照度 (Lux)</span>
+            <span class="aiot-tag">頂樓氣象桿</span>
+          </div>
+          <div class="aiot-value-row">
+            <span class="aiot-val" id="aiotLux">12,500</span>
+            <span class="aiot-unit">Lux</span>
+          </div>
+          <div class="aiot-bar-bg">
+            <div class="aiot-bar-fill fill-amber" id="aiotLuxBar" style="width: 45%;"></div>
+          </div>
+        </div>
+
+        <!-- Sensor 3: Barometric Pressure -->
+        <div class="glass-card aiot-card">
+          <div class="aiot-top">
+            <span class="aiot-label">大氣壓力</span>
+            <span class="aiot-tag">BME280 感測器</span>
+          </div>
+          <div class="aiot-value-row">
+            <span class="aiot-val" id="aiotPressure">1013.2</span>
+            <span class="aiot-unit">hPa</span>
+          </div>
+          <div class="aiot-bar-bg">
+            <div class="aiot-bar-fill fill-blue" id="aiotPressureBar" style="width: 65%;"></div>
+          </div>
+        </div>
+
+        <!-- Sensor 4: Node Signal & Battery -->
+        <div class="glass-card aiot-card">
+          <div class="aiot-top">
+            <span class="aiot-label">節點無線訊號 RSSI</span>
+            <span class="aiot-tag">LoRaWAN / 920MHz</span>
+          </div>
+          <div class="aiot-value-row">
+            <span class="aiot-val" id="aiotRssi">-62 dBm</span>
+            <span class="aiot-unit">優良</span>
+          </div>
+          <div class="aiot-bar-bg">
+            <div class="aiot-bar-fill fill-purple" id="aiotRssiBar" style="width: 85%;"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Trend Chart & 5-Day Forecast -->
+    <section class="chart-forecast-grid">
+      <!-- 24-Hour Trend Chart Card -->
+      <article class="glass-card chart-card">
+        <div class="chart-header">
+          <h3 style="font-size: 1.1rem; font-weight: 700;">📈 24 小時氣溫與相對濕度趨勢</h3>
+          <div class="chart-legend">
+            <div class="legend-item">
+              <span class="legend-color" style="background: var(--accent-cyan);"></span>
+              <span>氣溫 (°C)</span>
+            </div>
+            <div class="legend-item">
+              <span class="legend-color" style="background: var(--accent-emerald);"></span>
+              <span>相對濕度 (%)</span>
+            </div>
+          </div>
+        </div>
+        <div class="canvas-container">
+          <canvas id="trendChart"></canvas>
+        </div>
+      </article>
+
+      <!-- 5-Day Weather Forecast Card -->
+      <article class="glass-card forecast-card">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <h3 style="font-size: 1.1rem; font-weight: 700;">📅 未來一週天氣預報</h3>
+          <span style="font-size: 0.75rem; color: var(--text-muted);">CWA 官方預估</span>
+        </div>
+        <div class="forecast-list" id="forecastList">
+          <!-- Populated by JavaScript -->
+        </div>
+      </article>
+    </section>
+
+  </main>
+
+  <!-- CWA API Key Modal -->
+  <div class="modal-overlay" id="apiModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>🔑 氣象署 CWA API 授權設定</h3>
+        <button class="modal-close" id="closeModalBtn" aria-label="關閉視窗">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p>若您擁有交通部中央氣象署「開放資料平臺」的個人授權碼（Authorization Key），可在此填入。系統將直接向 CWA API 請求最新即時資料！</p>
+        <div class="input-group">
+          <label for="apiKeyInput">CWA Authorization API Key (例如：CWA-XXXXXXXX-XXXX...)</label>
+          <input type="text" id="apiKeyInput" class="input-field" placeholder="請在此貼上您的 CWA API 金鑰">
+        </div>
+        <p style="font-size: 0.75rem; color: var(--text-muted);">
+          * 提示：未填寫時系統自動使用內建的高精度觀測與 AIoT 數據進行展示，隨時可切換。
+        </p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn" id="cancelModalBtn" onclick="document.getElementById('apiModal').classList.remove('active')">取消</button>
+        <button class="btn btn-primary" id="saveApiBtn">儲存設定</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer class="site-footer">
+    <p>© 2026 國立中興大學 (NCHU) AIoT 物聯網物候智慧實驗室 • 資料串接：交通部中央氣象署 (CWA)</p>
+  </footer>
+
+  <!-- Controller Script -->
+  <script src="app.js"></script>
+</body>
+
+</html>

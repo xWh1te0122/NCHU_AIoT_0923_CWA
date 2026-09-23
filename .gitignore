@@ -1,0 +1,17 @@
+# Environments
+.env
+.venv/
+venv/
+env/
+__pycache__/
+*.pyc
+
+# Database
+# 評估結果：data.db 是透過執行程式動態產生的氣象資料，且檔案內容會隨時間與執行次數變動。
+# 在版控中追蹤二進位資料庫檔案容易造成衝突，且其他人拉取專案後只需自己設定好 .env 並執行 data_pipeline.py 即可獲取最新資料，因此建議忽略。
+data.db
+
+# OS / Editor
+.DS_Store
+.vscode/
+.idea/
