@@ -12,12 +12,12 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 load_dotenv()
 
 CWA_API_KEY = os.getenv("CWA_API_KEY")
-# F-D0047-091 為台灣各縣市未來一週天氣預報
-CWA_API_URL = "https://opendata.cwa.gov.tw/api/v1/rest/datastore/F-D0047-091"
+# O-A0003-001 為氣象觀測站-10分鐘綜觀氣象資料
+CWA_API_URL = "https://opendata.cwa.gov.tw/api/v1/rest/datastore/O-A0003-001"
 
 def fetch_weather_data(api_key=CWA_API_KEY):
     """
-    從中央氣象署取得未來一週天氣預報資料 (JSON)
+    從中央氣象署取得即時觀測氣象資料 (JSON)
     """
     if not api_key:
         raise ValueError("尚未設定 CWA_API_KEY，請在 .env 檔案中設定。")
@@ -33,104 +33,108 @@ def fetch_weather_data(api_key=CWA_API_KEY):
 
 def parse_weather_data(json_data):
     """
-    解析 JSON，提取各縣市每日最高溫 (MaxT) 與最低溫 (MinT)
+    解析 JSON，提取各觀測站的即時氣溫與經緯度資訊
     """
     records = []
     
-    # 解析 CWA JSON 結構 (注意大小寫)
-    locations_list = json_data.get('records', {}).get('Locations', [])
-    if not locations_list:
+    stations = json_data.get('records', {}).get('Station', [])
+    if not stations:
         return pd.DataFrame()
         
-    location_data = locations_list[0].get('Location', [])
-    
-    for loc in location_data:
-        regionName = loc.get('LocationName')
-        weatherElements = loc.get('WeatherElement', [])
+    for st in stations:
+        station_name = st.get('StationName')
+        station_id = st.get('StationId')
         
-        # 尋找最高溫度與最低溫度的 element
-        max_t_elem = next((e for e in weatherElements if e.get('ElementName') == '最高溫度'), None)
-        min_t_elem = next((e for e in weatherElements if e.get('ElementName') == '最低溫度'), None)
+        obs_time = st.get('ObsTime', {}).get('DateTime')
         
-        if not max_t_elem or not min_t_elem:
+        geo_info = st.get('GeoInfo', {})
+        county_name = geo_info.get('CountyName')
+        
+        # 尋找 WGS84 座標 (通常用於 Leaflet/Folium)
+        lat, lon = None, None
+        coords = geo_info.get('Coordinates', [])
+        for c in coords:
+            if c.get('CoordinateName') == 'WGS84':
+                lat = c.get('StationLatitude')
+                lon = c.get('StationLongitude')
+                break
+        
+        weather_elem = st.get('WeatherElement', {})
+        air_temp = weather_elem.get('AirTemperature')
+        weather = weather_elem.get('Weather')
+        
+        # 過濾掉異常值 (如 -99 或無效資料)
+        try:
+            air_temp_val = float(air_temp)
+            if air_temp_val == -99.0 or lat is None or lon is None:
+                continue
+            lat_val = float(lat)
+            lon_val = float(lon)
+        except (ValueError, TypeError):
             continue
             
-        max_t_times = max_t_elem.get('Time', [])
-        min_t_times = min_t_elem.get('Time', [])
-        
-        for i in range(min(len(max_t_times), len(min_t_times))):
-            start_time = max_t_times[i].get('StartTime')
-            # 轉換時間格式，取日期部分 (YYYY-MM-DD)
-            if not start_time:
-                continue
-            dataDate = start_time.split("T")[0].split(" ")[0]
-            
-            try:
-                # 取得數值 (第一個 value 通常就是溫度)
-                maxt_vals = list(max_t_times[i].get('ElementValue', [{}])[0].values())
-                mint_vals = list(min_t_times[i].get('ElementValue', [{}])[0].values())
-                
-                if maxt_vals and mint_vals:
-                    maxt_val = float(maxt_vals[0])
-                    mint_val = float(mint_vals[0])
-                    
-                    records.append({
-                        'regionName': regionName,
-                        'dataDate': dataDate,
-                        'mint': mint_val,
-                        'maxt': maxt_val
-                    })
-            except (ValueError, IndexError, TypeError):
-                continue
+        records.append({
+            'StationName': station_name,
+            'StationId': station_id,
+            'CountyName': county_name,
+            'ObsTime': obs_time,
+            'AirTemperature': air_temp_val,
+            'Weather': weather,
+            'Latitude': lat_val,
+            'Longitude': lon_val
+        })
                 
     df = pd.DataFrame(records)
-    # 同一天可能會有多筆資料 (白天/晚上)，我們可以取該日的最大值與最小值
-    if not df.empty:
-        df = df.groupby(['regionName', 'dataDate']).agg({'mint': 'min', 'maxt': 'max'}).reset_index()
-        
     return df
 
 def save_to_sqlite(df, db_path="data.db"):
     """
-    將 DataFrame 儲存至 SQLite 資料庫的 TemperatureForecasts 表格中
+    將 DataFrame 儲存至 SQLite 資料庫的 CurrentWeather 表格中
     """
     if df.empty:
-        print("沒有資料可以儲存")
+        print("沒有有效資料可以儲存")
         return
         
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
     
-    # 建立表格 (如果不存在)
+    # 建立新的 CurrentWeather 表格
     cursor.execute('''
-        CREATE TABLE IF NOT EXISTS TemperatureForecasts (
+        CREATE TABLE IF NOT EXISTS CurrentWeather (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            regionName TEXT,
-            dataDate TEXT,
-            mint REAL,
-            maxt REAL,
-            UNIQUE(regionName, dataDate) -- 防止重複插入
+            StationName TEXT,
+            StationId TEXT,
+            CountyName TEXT,
+            ObsTime TEXT,
+            AirTemperature REAL,
+            Weather TEXT,
+            Latitude REAL,
+            Longitude REAL,
+            UNIQUE(StationName, ObsTime) -- 防止同一個測站在同一時間重複寫入
         )
     ''')
     
-    # 使用 OR IGNORE 來避免重複插入
-    # 因為 pandas to_sql 不容易處理 UNIQUE 衝突，我們改用 iterrows 或是轉 dict
-    # 或者用 pandas to_sql 的方式存入暫存表再 insert
-    
+    # 使用暫存表來處理 INSERT OR IGNORE
     df.to_sql('TempStage', conn, if_exists='replace', index=False)
     
     insert_sql = '''
-        INSERT OR IGNORE INTO TemperatureForecasts (regionName, dataDate, mint, maxt)
-        SELECT regionName, dataDate, mint, maxt FROM TempStage
+        INSERT OR IGNORE INTO CurrentWeather 
+        (StationName, StationId, CountyName, ObsTime, AirTemperature, Weather, Latitude, Longitude)
+        SELECT StationName, StationId, CountyName, ObsTime, AirTemperature, Weather, Latitude, Longitude 
+        FROM TempStage
     '''
     cursor.execute(insert_sql)
+    
+    # 清理暫存表
+    cursor.execute("DROP TABLE IF EXISTS TempStage")
+    
     conn.commit()
     conn.close()
-    print(f"成功儲存 {len(df)} 筆資料至 {db_path}")
+    print(f"成功儲存 {len(df)} 筆觀測資料至 {db_path}")
 
 if __name__ == "__main__":
     try:
-        print("開始取得氣象資料...")
+        print("開始取得即時氣象觀測資料...")
         data = fetch_weather_data()
         
         print("解析資料中...")

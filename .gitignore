@@ -11,6 +11,9 @@ __pycache__/
 # 在版控中追蹤二進位資料庫檔案容易造成衝突，且其他人拉取專案後只需自己設定好 .env 並執行 data_pipeline.py 即可獲取最新資料，因此建議忽略。
 data.db
 
+# Vercel
+.vercel/
+
 # OS / Editor
 .DS_Store
 .vscode/

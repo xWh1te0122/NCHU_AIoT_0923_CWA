@@ -1,6 +1,4 @@
+# Python 依賴（僅 data_pipeline.py 使用，前端已改為 Vercel 靜態部署）
 requests
 pandas
-streamlit
-folium
-streamlit-folium
 python-dotenv
