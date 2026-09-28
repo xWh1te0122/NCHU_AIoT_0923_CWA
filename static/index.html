@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Taiwan Weather GIS Dashboard</title>
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="/static/style.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <div id="app">
+        <!-- Sidebar Dashboard -->
+        <aside class="sidebar glass">
+            <div class="sidebar-header">
+                <h1>🌤️ AIoT CWA GIS</h1>
+                <p>即時台灣氣象監控儀表板</p>
+            </div>
+            <div class="sidebar-content">
+                <div class="status-box">
+                    <h3>系統狀態</h3>
+                    <p class="status-ok">🟢 API 連線正常</p>
+                    <p class="status-db">🟢 SQLite 已連線 (data.db)</p>
+                </div>
+
+                <div class="controls">
+                    <h3>圖層控制</h3>
+                    <label class="toggle">
+                        <input type="checkbox" id="layerTemp" checked>
+                        <span class="slider"></span>
+                        溫度標籤 (Temp)
+                    </label>
+                    <label class="toggle">
+                        <input type="checkbox" id="layerPop">
+                        <span class="slider"></span>
+                        降雨機率 (PoP)
+                    </label>
+                    <hr>
+                    <h3>底圖切換</h3>
+                    <div class="map-style-btns">
+                        <button id="btnDarkMap" class="active">Carto Dark</button>
+                        <button id="btnStreetMap">OSM Street</button>
+                    </div>
+                </div>
+            </div>
+            <div class="sidebar-footer">
+                <p>Data Source: 中央氣象署 Open Data</p>
+            </div>
+        </aside>
+
+        <!-- Map Container -->
+        <main class="map-container">
+            <div id="map"></div>
+            <!-- Loading Overlay -->
+            <div id="loader" class="glass-loader">
+                <div class="spinner"></div>
+                <p>載入氣象資料中...</p>
+            </div>
+        </main>
+    </div>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="/static/script.js"></script>
+</body>
+
+</html>

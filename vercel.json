@@ -1,16 +1,14 @@
 {
-  "version": 2,
-  "name": "nchu-aiot-cwa-weather",
   "builds": [
     {
-      "src": "index.html",
-      "use": "@vercel/static"
+      "src": "api/index.py",
+      "use": "@vercel/python"
     }
   ],
   "routes": [
     {
       "src": "/(.*)",
-      "dest": "/$1"
+      "dest": "api/index.py"
     }
   ]
 }
