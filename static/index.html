@@ -4,67 +4,212 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Taiwan Weather GIS Dashboard</title>
+    <title>AIoT CWA GIS — 台灣即時氣象監控儀表板</title>
+    <meta name="description" content="基於中央氣象署 Open Data 的台灣即時氣象 GIS 監控儀表板，整合 22 縣市天氣預報、災防警報與觀測資料。">
+
     <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <link rel="stylesheet" href="/static/style.css">
     <!-- Google Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+    <!-- App CSS -->
+    <link rel="stylesheet" href="/static/style.css">
 </head>
 
 <body>
     <div id="app">
-        <!-- Sidebar Dashboard -->
-        <aside class="sidebar glass">
-            <div class="sidebar-header">
-                <h1>🌤️ AIoT CWA GIS</h1>
-                <p>即時台灣氣象監控儀表板</p>
-            </div>
-            <div class="sidebar-content">
-                <div class="status-box">
-                    <h3>系統狀態</h3>
-                    <p class="status-ok">🟢 API 連線正常</p>
-                    <p class="status-db">🟢 SQLite 已連線 (data.db)</p>
-                </div>
 
-                <div class="controls">
-                    <h3>圖層控制</h3>
-                    <label class="toggle">
-                        <input type="checkbox" id="layerTemp" checked>
-                        <span class="slider"></span>
-                        溫度標籤 (Temp)
-                    </label>
-                    <label class="toggle">
-                        <input type="checkbox" id="layerPop">
-                        <span class="slider"></span>
-                        降雨機率 (PoP)
-                    </label>
-                    <hr>
-                    <h3>底圖切換</h3>
-                    <div class="map-style-btns">
-                        <button id="btnDarkMap" class="active">Carto Dark</button>
-                        <button id="btnStreetMap">OSM Street</button>
+        <!-- ─── ALERT BANNER ─── -->
+        <div id="alert-banner" role="alert" aria-live="polite">
+            <div class="alert-dot red" id="alert-dot"></div>
+            <div class="alert-icon" id="alert-icon">🔴</div>
+            <div class="alert-content">
+                <div class="alert-title" id="alert-title">即時警報</div>
+                <div class="alert-marquee">
+                    <span id="alert-text">載入中...</span>
+                </div>
+            </div>
+            <button class="alert-close" id="alert-close" aria-label="關閉警報">✕</button>
+        </div>
+
+        <!-- ─── FLOATING SIDEBAR ─── -->
+        <aside class="sidebar" role="complementary" aria-label="控制面板">
+            <div class="sidebar-header">
+                <div class="sidebar-logo">
+                    <div class="logo-icon">🌤️</div>
+                    <h1>AIoT CWA GIS</h1>
+                </div>
+                <p class="subtitle">即時台灣氣象監控儀表板</p>
+                <div class="sidebar-time">
+                    <div class="time-dot"></div>
+                    <span id="current-time">載入中...</span>
+                </div>
+            </div>
+
+            <div class="sidebar-content">
+
+                <!-- F-11: 快速城市搜尋 (客製化下拉選單) -->
+                <div class="search-container">
+                    <div class="custom-select-wrapper" id="custom-city-select">
+                        <div class="custom-select-trigger">
+                            <span id="custom-select-text">快速移動至縣市...</span>
+                            <div class="custom-select-arrow"></div>
+                        </div>
+                        <ul class="custom-select-options" id="custom-city-options">
+                            <!-- JS 產生選項 -->
+                        </ul>
                     </div>
                 </div>
-            </div>
+
+                <!-- Accordion 1: 系統狀態 -->
+                <div class="accordion open" id="acc-status">
+                    <div class="accordion-header" onclick="toggleAccordion('acc-status')">
+                        <div class="accordion-icon">📡</div>
+                        <div class="accordion-title">系統狀態</div>
+                        <span class="accordion-badge badge-ok" id="badge-status">正常</span>
+                        <span class="accordion-chevron">▼</span>
+                    </div>
+                    <div class="accordion-body">
+                        <div class="accordion-inner">
+                            <div class="status-item">
+                                <div class="status-led led-ok" id="led-api"></div>
+                                <span class="status-label">CWA API</span>
+                                <span class="status-value" id="val-api">連線中</span>
+                            </div>
+                            <div class="status-item">
+                                <div class="status-led led-ok" id="led-db"></div>
+                                <span class="status-label">SQLite</span>
+                                <span class="status-value" id="val-db">data.db</span>
+                            </div>
+                            <div class="status-item clickable-status" onclick="openAlertModal()" title="點擊查看詳細警報清單">
+                                <div class="status-led led-ok" id="led-alert"></div>
+                                <span class="status-label">警報系統</span>
+                                <span class="status-value" id="val-alert">監測中</span>
+                                <span class="status-action" style="margin-left: auto; font-size: 0.75rem; color: var(--accent-blue);">🔍</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Accordion 2: 圖層控制 -->
+                <div class="accordion open" id="acc-layers">
+                    <div class="accordion-header" onclick="toggleAccordion('acc-layers')">
+                        <div class="accordion-icon">🗂️</div>
+                        <div class="accordion-title">圖層控制</div>
+                        <span class="accordion-badge badge-ok" id="badge-layers">6 層</span>
+                        <span class="accordion-chevron">▼</span>
+                    </div>
+                    <div class="accordion-body">
+                        <div class="accordion-inner">
+                            <label class="layer-item" for="layerTemp">
+                                <input type="checkbox" id="layerTemp" checked>
+                                <div class="layer-color-dot" style="background: var(--layer-temp); box-shadow: 0 0 5px var(--layer-temp);"></div>
+                                <span class="layer-label">溫度標籤 (Temp)</span>
+                                <div class="toggle-switch"></div>
+                            </label>
+                            <label class="layer-item" for="layerPop">
+                                <input type="checkbox" id="layerPop">
+                                <div class="layer-color-dot" style="background: var(--layer-pop); box-shadow: 0 0 5px var(--layer-pop);"></div>
+                                <span class="layer-label">降雨機率 (PoP)</span>
+                                <div class="toggle-switch"></div>
+                            </label>
+                            <label class="layer-item" for="layerWind">
+                                <input type="checkbox" id="layerWind">
+                                <div class="layer-color-dot" style="background: var(--layer-wind); box-shadow: 0 0 5px var(--layer-wind);"></div>
+                                <span class="layer-label">風速 (Wind)</span>
+                                <div class="toggle-switch"></div>
+                            </label>
+                            <label class="layer-item" for="layerHumd">
+                                <input type="checkbox" id="layerHumd">
+                                <div class="layer-color-dot" style="background: var(--layer-humd); box-shadow: 0 0 5px var(--layer-humd);"></div>
+                                <span class="layer-label">相對濕度 (HUMD)</span>
+                                <div class="toggle-switch"></div>
+                            </label>
+                            <label class="layer-item" for="layerHeat">
+                                <input type="checkbox" id="layerHeat">
+                                <div class="layer-color-dot" style="background: linear-gradient(135deg, #00f, #ff0, #f00); box-shadow: 0 0 5px rgba(255,0,0,0.5);"></div>
+                                <span class="layer-label">溫度熱力圖 (Heatmap)</span>
+                                <div class="toggle-switch"></div>
+                            </label>
+                            <label class="layer-item" for="layerDebugObs">
+                                <input type="checkbox" id="layerDebugObs">
+                                <div class="layer-color-dot" style="background: #a78bfa; box-shadow: 0 0 5px #a78bfa;"></div>
+                                <span class="layer-label">測站觀測點 (Debug)</span>
+                                <div class="toggle-switch"></div>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Accordion 3: 底圖切換 -->
+                <div class="accordion open" id="acc-basemap">
+                    <div class="accordion-header" onclick="toggleAccordion('acc-basemap')">
+                        <div class="accordion-icon">🗺️</div>
+                        <div class="accordion-title">底圖切換</div>
+                        <span class="accordion-chevron">▼</span>
+                    </div>
+                    <div class="accordion-body">
+                        <div class="accordion-inner">
+                            <div class="basemap-grid">
+                                <button class="basemap-btn active" id="btnDarkMap">
+                                    <span class="btn-emoji">🌙</span>
+                                    Carto Dark
+                                </button>
+                                <button class="basemap-btn" id="btnStreetMap">
+                                    <span class="btn-emoji">🏙️</span>
+                                    OSM Street
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div><!-- /sidebar-content -->
+
             <div class="sidebar-footer">
+                <button class="btn-refresh" id="btn-refresh" onclick="handleRefresh()">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>
+                    重新整理資料
+                </button>
                 <p>Data Source: 中央氣象署 Open Data</p>
             </div>
         </aside>
 
-        <!-- Map Container -->
+        <!-- ─── MAP CONTAINER ─── -->
         <main class="map-container">
-            <div id="map"></div>
-            <!-- Loading Overlay -->
+            <div id="map" role="main" aria-label="台灣氣象地圖"></div>
             <div id="loader" class="glass-loader">
-                <div class="spinner"></div>
-                <p>載入氣象資料中...</p>
+                <div class="spinner-ring"></div>
+                <p class="loader-text">載入氣象資料中...</p>
             </div>
         </main>
+
+    </div><!-- /#app -->
+
+    <!-- ─── ALERT MODAL (F-04: 清單面板) ─── -->
+    <div id="alert-modal" role="dialog" aria-modal="true" aria-labelledby="modal-title-text">
+        <div class="alert-modal-card">
+            <div class="modal-header">
+                <div class="modal-icon">🔔</div>
+                <div>
+                    <div class="modal-title" id="modal-title-text">警報總覽</div>
+                    <div class="modal-subtitle">即時監測中</div>
+                </div>
+            </div>
+            <div class="modal-body alert-list-container" id="modal-body-list">
+                <!-- List items will be generated here -->
+            </div>
+            <button class="modal-close-btn" onclick="closeAlertModal()">關閉</button>
+        </div>
     </div>
 
     <!-- Leaflet JS -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <!-- Leaflet.markercluster (F-02: 觀測站聚合) -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+    <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+    <!-- Turf.js (F-05: 溫度空間插值) -->
+    <script src="https://unpkg.com/@turf/turf@6.5.0/turf.min.js"></script>
     <script src="/static/script.js"></script>
 </body>
 
